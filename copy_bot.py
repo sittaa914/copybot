@@ -1,8 +1,5 @@
 ﻿import os
 import logging
-import asyncio
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -108,32 +105,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Operazione annullata o sessione chiusa.")
     return ConversationHandler.END
 
-# Server HTTP fittizio per Render
-class DummyHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is active 24/7!")
-
-def run_web_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(('0.0.0.0', port), DummyHandler)
-    server.serve_forever()
-
 def main():
     if not TOKEN:
         print("ERRORE: Variabile d'ambiente TOKEN non trovata!")
         return
-
-    # Avvia il server web fittizio in background
-    server_thread = threading.Thread(target=run_web_server, daemon=True)
-    server_thread.start()
-
-    # Assicura che esista un event loop per il thread principale
-    try:
-        asyncio.get_event_loop()
-    except RuntimeError:
-        asyncio.set_event_loop(asyncio.new_event_loop())
 
     application = ApplicationBuilder().token(TOKEN).build()
 
