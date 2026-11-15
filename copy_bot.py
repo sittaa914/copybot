@@ -1,5 +1,6 @@
 ﻿import os
 import logging
+import asyncio
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 from telegram import Update
@@ -18,7 +19,7 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-# Legge il token dalle variabili d'ambiente di Render (sicuro e protetto)
+# Legge il token dalle variabili d'ambiente di Render
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 7935524220
 
@@ -107,7 +108,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Operazione annullata o sessione chiusa.")
     return ConversationHandler.END
 
-# Server HTTP fittizio per soddisfare i requisiti di Render Web Service
+# Server HTTP fittizio per Render
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -124,9 +125,15 @@ def main():
         print("ERRORE: Variabile d'ambiente TOKEN non trovata!")
         return
 
-    # Avvia il server web fittizio in background per Render
+    # Avvia il server web fittizio in background
     server_thread = threading.Thread(target=run_web_server, daemon=True)
     server_thread.start()
+
+    # Assicura che esista un event loop per il thread principale
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
     application = ApplicationBuilder().token(TOKEN).build()
 
