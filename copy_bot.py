@@ -1,6 +1,7 @@
 ﻿import os
 import logging
-import asyncio
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -17,7 +18,8 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-TOKEN = "inserisci_il_tuo_token"
+# Legge il token dalle variabili d'ambiente di Render (sicuro e protetto)
+TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 7935524220
 
 # Saldo fittizio disponibile sul conto (0.00 Euro)
@@ -51,7 +53,6 @@ async def get_budget(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         budget = float(update.message.text.strip().replace(',', '.'))
         
-        # Controllo se il budget richiesto supera il saldo disponibile
         if budget > SALDO_DISPONIBILE:
             await update.message.reply_text(
                 f"Non hai {budget} euro.\n"
@@ -106,7 +107,27 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Operazione annullata o sessione chiusa.")
     return ConversationHandler.END
 
+# Server HTTP fittizio per soddisfare i requisiti di Render Web Service
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is active 24/7!")
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), DummyHandler)
+    server.serve_forever()
+
 def main():
+    if not TOKEN:
+        print("ERRORE: Variabile d'ambiente TOKEN non trovata!")
+        return
+
+    # Avvia il server web fittizio in background per Render
+    server_thread = threading.Thread(target=run_web_server, daemon=True)
+    server_thread.start()
+
     application = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
