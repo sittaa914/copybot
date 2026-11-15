@@ -1,7 +1,7 @@
-﻿import os
+import os
 import logging
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from flask import Flask
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -18,11 +18,8 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-# Legge il token dalle variabili d'ambiente di Render
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 7935524220
-
-# Saldo fittizio disponibile sul conto (0.00 Euro)
 SALDO_DISPONIBILE = 0.00
 
 # Stati per la conversazione
@@ -107,28 +104,25 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Operazione annullata o sessione chiusa.")
     return ConversationHandler.END
 
-# Server HTTP fittizio richiesto dai Web Service di Render
-class DummyHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is active 24/7!")
-    def log_message(self, format, *args):
-        pass # Evita di intasare i log con le richieste HTTP di controllo
+# Server Web Flask per soddisfare i requisiti del Web Service di Render
+app = Flask(__name__)
 
-def run_web_server():
+@app.route('/')
+def home():
+    return "Bot is running 24/7!"
+
+def run_flask():
     port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(('0.0.0.0', port), DummyHandler)
-    server.serve_forever()
+    app.run(host='0.0.0.0', port=port, use_reloader=False)
 
 def main():
     if not TOKEN:
         print("ERRORE: Variabile d'ambiente TOKEN non trovata!")
         return
 
-    # Avvia il server web in un thread separato (così Render è soddisfatto)
-    server_thread = threading.Thread(target=run_web_server, daemon=True)
-    server_thread.start()
+    # Avvia Flask in un thread separato in background
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
 
     # Avvia il bot Telegram nel thread principale
     application = ApplicationBuilder().token(TOKEN).build()
@@ -156,7 +150,7 @@ def main():
     application.add_handler(MessageHandler(filters.Regex("(?i)^resoconto$"), resoconto))
     application.add_handler(CommandHandler('stop', cancel))
 
-    print("Application started")
+    print("Application and Flask server started")
     application.run_polling()
 
 if __name__ == '__main__':
