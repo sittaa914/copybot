@@ -1,5 +1,7 @@
 ﻿import os
 import logging
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -105,11 +107,30 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Operazione annullata o sessione chiusa.")
     return ConversationHandler.END
 
+# Server HTTP fittizio richiesto dai Web Service di Render
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is active 24/7!")
+    def log_message(self, format, *args):
+        pass # Evita di intasare i log con le richieste HTTP di controllo
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), DummyHandler)
+    server.serve_forever()
+
 def main():
     if not TOKEN:
         print("ERRORE: Variabile d'ambiente TOKEN non trovata!")
         return
 
+    # Avvia il server web in un thread separato (così Render è soddisfatto)
+    server_thread = threading.Thread(target=run_web_server, daemon=True)
+    server_thread.start()
+
+    # Avvia il bot Telegram nel thread principale
     application = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
