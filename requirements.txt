@@ -1,0 +1,5 @@
+python-telegram-bot>=21.0
+httpx>=0.27
+solders>=0.21
+flask>=3.0
+websockets>=12.0
